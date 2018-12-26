@@ -39,7 +39,7 @@ namespace Metamory.Api.Providers.FileSystem
 			var folderPath = Path.Combine(_configuration.StatusRootPath, siteId, statusEntry.ContentId);
 			Directory.CreateDirectory(folderPath);
 
-			var filePath = Path.Combine(folderPath, statusEntry.ContentId, CONTENTSTATUS_FILENAME);
+			var filePath = Path.Combine(folderPath, CONTENTSTATUS_FILENAME);
 			using (var sw = new StreamWriter(filePath, true))
 			{
 				await sw.WriteLineAsync(statusEntry.ToString());
