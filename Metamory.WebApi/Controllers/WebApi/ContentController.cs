@@ -59,7 +59,7 @@ namespace Metamory.WebApi.Controllers.WebApi
 
 			if (!_authPolicy.AllowGetCurrentPublishedContent(siteId, contentId, User))
 			{
-				return new HttpResponseMessage(User.Identity.IsAuthenticated ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized );
+				return new HttpResponseMessage(User.Identity.IsAuthenticated ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized);
 			}
 
 			// //TODO:
@@ -71,7 +71,7 @@ namespace Metamory.WebApi.Controllers.WebApi
 			// 	return notModifiedMessage;
 			// }
 
-			if(publishedVersionId == null)
+			if (publishedVersionId == null)
 			{
 				var notFoundMessage = new HttpResponseMessage(HttpStatusCode.NotFound);
 				return notFoundMessage;
@@ -84,7 +84,7 @@ namespace Metamory.WebApi.Controllers.WebApi
 			var responseMessage = new HttpResponseMessage(HttpStatusCode.OK);
 			responseMessage.Content = new StreamContent(stream);
 			responseMessage.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-				responseMessage.Headers.ETag = new EntityTagHeaderValue("\"" + publishedVersionId + "\"");
+			responseMessage.Headers.ETag = new EntityTagHeaderValue("\"" + publishedVersionId + "\"");
 			return responseMessage;
 		}
 
@@ -93,7 +93,7 @@ namespace Metamory.WebApi.Controllers.WebApi
 		{
 			if (!_authPolicy.AllowManageContent(siteId, contentId, User))
 			{
-				return new HttpResponseMessage(User.Identity.IsAuthenticated ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized );
+				return new HttpResponseMessage(User.Identity.IsAuthenticated ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized);
 			}
 
 			var stream = new MemoryStream();
@@ -137,17 +137,18 @@ namespace Metamory.WebApi.Controllers.WebApi
 			}
 
 			PostContentModel model;
-			if (requestMessage.Content.IsMimeMultipartContent())
+			// if (this.Request.Content.IsMimeMultipartContent())
+			// {
+			// 	model = await GetPostContentModelFromMultiPartAsync(siteId, contentId, requestMessage);
+			// }
+			// else if (requestMessage.Content.IsFormData())
+			if (this.Request.HasFormContentType)
 			{
-				model = await GetPostContentModelFromMultiPartAsync(siteId, contentId, requestMessage);
-			}
-			else if (requestMessage.Content.IsFormData())
-			{
-				model = await GetPostContentModelFromFormAsync(siteId, contentId, requestMessage);
+				model = await GetPostContentModelFromFormAsync(siteId, contentId);
 			}
 			else
 			{
-				model = await GetPostContentModelFromAjaxAsync(siteId, contentId, requestMessage);
+				model = await GetPostContentModelFromAjaxAsync(siteId, contentId);
 			}
 
 
@@ -161,16 +162,38 @@ namespace Metamory.WebApi.Controllers.WebApi
 			return new StatusCodeResult((int)HttpStatusCode.BadRequest);
 		}
 
-		private async Task<PostContentModel> GetPostContentModelFromAjaxAsync(string siteId, string contentId, HttpRequestMessage requestMessage)
+		private async Task<PostContentModel> GetPostContentModelFromAjaxAsync(string siteId, string contentId)
 		{
-			string jsonBodyString = await requestMessage.Content.ReadAsStringAsync();
-
-			var jsonBody = JObject.Parse(jsonBodyString);
-			Func<string, string> GetValue = key =>
+			using (var sr = new StreamReader(this.Request.Body))
 			{
-				var val = jsonBody[key];
-				return val != null ? val.ToString() : null;
+				string jsonBodyString = await sr.ReadToEndAsync();
+				var jsonBody = JObject.Parse(jsonBodyString);
+
+				Func<string, string> GetValue = key =>
+				{
+					var val = jsonBody[key];
+					return val != null ? val.ToString() : null;
+				};
+
+				var model = new PostContentModel()
+				{
+					Author = GetValue("author"),
+					Label = GetValue("label"),
+					PreviousVersionId = GetValue("previousVersionId"),
+					ContentType = GetValue("contentType"),
+					ContentStream = new MemoryStream(Encoding.UTF8.GetBytes(GetValue("content")))
+				};
+
+				return model;
 			};
+
+
+		}
+
+		private async Task<PostContentModel> GetPostContentModelFromFormAsync(string siteId, string contentId)
+		{
+			var formValues = await this.Request.ReadFormAsync();
+			Func<string, string> GetValue = key => formValues[key];
 
 			var model = new PostContentModel()
 			{
@@ -184,54 +207,37 @@ namespace Metamory.WebApi.Controllers.WebApi
 			return model;
 		}
 
-		private async Task<PostContentModel> GetPostContentModelFromFormAsync(string siteId, string contentId, HttpRequestMessage requestMessage)
-		{
-			var formValues = await requestMessage.Content.ReadAsFormDataAsync();
-			Func<string, string> GetValue = key => formValues.AllKeys.Contains(key) ? formValues[key] : null;
+		// private async Task<PostContentModel> GetPostContentModelFromMultiPartAsync(string siteId, string contentId, HttpRequestMessage requestMessage)
+		// {
+		// 	var provider = await requestMessage.Content.ReadAsMultipartAsync(new MultipartMemoryStreamProvider());
 
-			var model = new PostContentModel()
-			{
-				Author = GetValue("author"),
-				Label = GetValue("label"),
-				PreviousVersionId = GetValue("previousVersionId"),
-				ContentType = GetValue("contentType"),
-				ContentStream = new MemoryStream(Encoding.UTF8.GetBytes(GetValue("content")))
-			};
+		// 	var model = new PostContentModel();
+		// 	foreach (var content in provider.Contents)
+		// 	{
+		// 		if (content.Headers.ContentDisposition.Name == "\"author\"")
+		// 		{
+		// 			model.Author = await content.ReadAsStringAsync();
+		// 		}
 
-			return model;
-		}
+		// 		if (content.Headers.ContentDisposition.Name == "\"label\"")
+		// 		{
+		// 			model.Label = await content.ReadAsStringAsync();
+		// 		}
 
-		private async Task<PostContentModel> GetPostContentModelFromMultiPartAsync(string siteId, string contentId, HttpRequestMessage requestMessage)
-		{
-			var provider = await requestMessage.Content.ReadAsMultipartAsync(new MultipartMemoryStreamProvider());
+		// 		if (content.Headers.ContentDisposition.Name == "\"previousVersionId\"")
+		// 		{
+		// 			model.PreviousVersionId = await content.ReadAsStringAsync();
+		// 		}
 
-			var model = new PostContentModel();
-			foreach (var content in provider.Contents)
-			{
-				if (content.Headers.ContentDisposition.Name == "\"author\"")
-				{
-					model.Author = await content.ReadAsStringAsync();
-				}
+		// 		if (content.Headers.ContentDisposition.Name == "\"content\"")
+		// 		{
+		// 			model.ContentStream = await content.ReadAsStreamAsync();
+		// 			model.ContentType = content.Headers.ContentType.MediaType;
+		// 		}
+		// 	}
 
-				if (content.Headers.ContentDisposition.Name == "\"label\"")
-				{
-					model.Label = await content.ReadAsStringAsync();
-				}
-
-				if (content.Headers.ContentDisposition.Name == "\"previousVersionId\"")
-				{
-					model.PreviousVersionId = await content.ReadAsStringAsync();
-				}
-
-				if (content.Headers.ContentDisposition.Name == "\"content\"")
-				{
-					model.ContentStream = await content.ReadAsStreamAsync();
-					model.ContentType = content.Headers.ContentType.MediaType;
-				}
-			}
-
-			return model;
-		}
+		// 	return model;
+		// }
 
 
 		//[HttpDelete, Route("content/{siteId}/{contentId}")]

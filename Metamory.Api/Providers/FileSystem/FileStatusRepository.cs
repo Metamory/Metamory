@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Metamory.Api.Repositories;
+using Microsoft.Extensions.Options;
 
 namespace Metamory.Api.Providers.FileSystem
 {
@@ -18,14 +19,22 @@ namespace Metamory.Api.Providers.FileSystem
 		private const string CONTENTSTATUS_FILENAME = "StatusEntries.csv";
 		private readonly IFileStatusRepositoryConfiguration _configuration;
 
-		public FileStatusRepository(IFileStatusRepositoryConfiguration configuration)
+
+		public FileStatusRepository(IOptions<FileRepositoryConfiguration> configurationAccessor)
 		{
-			_configuration = configuration;
+			_configuration = configurationAccessor.Value;
 		}
+
 
 		public async Task<IEnumerable<ContentStatusEntity>> GetStatusEntriesAsync(string siteId, string contentId)
 		{
 			var filePath = Path.Combine(_configuration.StatusRootPath, siteId, contentId, CONTENTSTATUS_FILENAME);
+			
+			if(!File.Exists(filePath))
+			{
+				return Enumerable.Empty<ContentStatusEntity>();
+			}
+			
 			using (var sr = new StreamReader(filePath))
 			{
 				var everything = await sr.ReadToEndAsync();
@@ -40,7 +49,7 @@ namespace Metamory.Api.Providers.FileSystem
 			var folderPath = Path.Combine(_configuration.StatusRootPath, siteId, statusEntry.ContentId);
 			Directory.CreateDirectory(folderPath);
 
-			var filePath = Path.Combine(folderPath, statusEntry.ContentId, CONTENTSTATUS_FILENAME);
+			var filePath = Path.Combine(folderPath, CONTENTSTATUS_FILENAME);
 			using (var sw = new StreamWriter(filePath, true))
 			{
 				await sw.WriteLineAsync(statusEntry.ToString());

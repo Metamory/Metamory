@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Metamory.Api.Repositories;
+using Microsoft.Extensions.Options;
 
 namespace Metamory.Api.Providers.FileSystem
 {
@@ -19,10 +20,12 @@ namespace Metamory.Api.Providers.FileSystem
 
 		private readonly IFileContentRepositoryConfiguration _configuration;
 
-		public FileContentRepository(IFileContentRepositoryConfiguration configuration)
+
+		public FileContentRepository(IOptions<FileRepositoryConfiguration> configurationAccessor)
 		{
-			_configuration = configuration;
+			_configuration = configurationAccessor.Value;
 		}
+
 
 		public async Task<string> DownloadContentToStreamAsync(string siteId, string contentId, string versionId, Stream memoryStream)
 		{
@@ -71,8 +74,15 @@ namespace Metamory.Api.Providers.FileSystem
 		public async Task<IEnumerable<ContentMetadataEntity>> GetVersionsAsync(string siteId, string contentId)
 		{
 			var folderPath = Path.Combine(_configuration.ContentRootPath, siteId, contentId);
-			var metadataTasks = Directory.GetFiles(folderPath, $"*.metadata")
-										 .Select(async filename => await FromFile(filename));
+
+			if (!Directory.Exists(folderPath))
+			{
+				return Enumerable.Empty<ContentMetadataEntity>();
+			}
+
+			var metadataTasks = Directory.GetFiles(folderPath, $"*.{METADATA_EXTENSION}")
+										 .Select(async filename => await FromFile(filename))
+										 .ToArray();
 
 			return await Task.WhenAll(metadataTasks);
 		}

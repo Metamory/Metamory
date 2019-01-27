@@ -2,6 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Metamory.Api;
+using Metamory.Api.Providers.FileSystem;
+using Metamory.Api.Repositories;
+using Metamory.WebApi.Policies;
+using Metamory.WebApi.Policies.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -35,6 +40,16 @@ namespace Metamory.WebApi
                     .AllowAnyHeader()
                     .AllowCredentials());
             });
+
+			services.AddOptions();
+			services.Configure<FileRepositoryConfiguration>(Configuration.GetSection("FileRepositoryConfiguration"));
+
+			services.AddTransient<ContentManagementService>();
+			services.AddTransient<IAuthorizationPolicy, NoAuthorizationPolicy>();
+			services.AddTransient<IStatusRepository, FileStatusRepository>();
+			services.AddTransient<IContentRepository, FileContentRepository>();
+			services.AddTransient<VersioningService>();
+			services.AddTransient<CanonicalizeService>();
 		}
 
 		// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
