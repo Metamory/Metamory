@@ -3,18 +3,17 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.Http;
 using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 using Metamory.Api;
 using Metamory.WebApi.Models.WebApi.Content;
 using Metamory.WebApi.Policies;
 using Metamory.WebApi.Utils;
 using Newtonsoft.Json.Linq;
-
-using Microsoft.AspNetCore.Mvc;
 
 
 namespace Metamory.WebApi.Controllers.WebApi
@@ -34,7 +33,7 @@ namespace Metamory.WebApi.Controllers.WebApi
 		}
 
 		[HttpGet, Route("content/{siteId}/{contentId}/versions")]
-		public async Task<ActionResult> GetVersions(string siteId, string contentId)
+		public async Task<IActionResult> GetVersions(string siteId, string contentId)
 		{
 			if (!_authPolicy.AllowManageContent(siteId, contentId, User))
 			{
@@ -53,13 +52,13 @@ namespace Metamory.WebApi.Controllers.WebApi
 		}
 
 		[HttpGet, Route("content/{siteId}/{contentId}")]
-		public async Task<HttpResponseMessage> GetPublishedContent(string siteId, string contentId)
+		public async Task<IActionResult> GetPublishedContent(string siteId, string contentId)
 		{
 			string publishedVersionId = await _contentManagementService.GetCurrentlyPublishedVersionIdAsync(siteId, contentId, DateTimeOffset.Now);
 
 			if (!_authPolicy.AllowGetCurrentPublishedContent(siteId, contentId, User))
 			{
-				return new HttpResponseMessage(User.Identity.IsAuthenticated ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized);
+				return new StatusCodeResult( User.Identity.IsAuthenticated ? (int)HttpStatusCode.Forbidden : (int)HttpStatusCode.Unauthorized);
 			}
 
 			// //TODO:
@@ -73,27 +72,22 @@ namespace Metamory.WebApi.Controllers.WebApi
 
 			if (publishedVersionId == null)
 			{
-				var notFoundMessage = new HttpResponseMessage(HttpStatusCode.NotFound);
-				return notFoundMessage;
+				return new NotFoundResult();
 			}
 
 			var stream = new MemoryStream();
 			var contentType = await _contentManagementService.DownloadContentToStreamAsync(siteId, contentId, publishedVersionId, stream);
 			stream.Seek(0, SeekOrigin.Begin);
 
-			var responseMessage = new HttpResponseMessage(HttpStatusCode.OK);
-			responseMessage.Content = new StreamContent(stream);
-			responseMessage.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-			responseMessage.Headers.ETag = new EntityTagHeaderValue("\"" + publishedVersionId + "\"");
-			return responseMessage;
+			return new FileStreamResult(stream, contentType){ EntityTag = new EntityTagHeaderValue($@"""{ publishedVersionId }""")};
 		}
 
 		[HttpGet, Route("content/{siteId}/{contentId}/{versionId}")]
-		public async Task<HttpResponseMessage> GetContent(string siteId, string contentId, string versionId)
+		public async Task<IActionResult> GetContent(string siteId, string contentId, string versionId)
 		{
 			if (!_authPolicy.AllowManageContent(siteId, contentId, User))
 			{
-				return new HttpResponseMessage(User.Identity.IsAuthenticated ? HttpStatusCode.Forbidden : HttpStatusCode.Unauthorized);
+				return new StatusCodeResult( User.Identity.IsAuthenticated ? (int)HttpStatusCode.Forbidden : (int)HttpStatusCode.Unauthorized);
 			}
 
 			var stream = new MemoryStream();
@@ -102,19 +96,14 @@ namespace Metamory.WebApi.Controllers.WebApi
 
 			if (contentType == null)
 			{
-				var notFoundMessage = new HttpResponseMessage(HttpStatusCode.NotFound);
-				return notFoundMessage;
+				return new NotFoundResult();
 			}
 
-			var responseMessage = new HttpResponseMessage(HttpStatusCode.OK);
-			responseMessage.Content = new StreamContent(stream);
-			responseMessage.Content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-
-			return responseMessage;
+			return new FileStreamResult(stream, contentType);
 		}
 
 		[HttpPost, Route("content/{siteId}/{contentId}/{versionId}/status")]
-		public async Task<ActionResult> PostStatusChange(string siteId, string contentId, string versionId, StatusChangeModel statusModel)
+		public async Task<IActionResult> PostStatusChange(string siteId, string contentId, string versionId, StatusChangeModel statusModel)
 		{
 			if (!_authPolicy.AllowChangeContentStatus(siteId, contentId, User))
 			{
@@ -129,7 +118,7 @@ namespace Metamory.WebApi.Controllers.WebApi
 
 		//[HttpPut, Route("content/{site}/{contentId}")]
 		[HttpPost, Route("content/{siteId}/{contentId}")]
-		public async Task<ActionResult> Post(string siteId, string contentId, HttpRequestMessage requestMessage)
+		public async Task<IActionResult> Post(string siteId, string contentId, HttpRequestMessage requestMessage)
 		{
 			if (!_authPolicy.AllowManageContent(siteId, contentId, User))
 			{
