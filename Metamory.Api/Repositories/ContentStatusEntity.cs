@@ -15,7 +15,7 @@ namespace Metamory.Api.Repositories
 
 		public override string ToString()
 		{
-			return $"{Timestamp};{ContentId};{VersionId};{StartTime};{Status};{Responsible}";
+			return $"{Timestamp:o};{ContentId};{VersionId};{StartTime:o};{Status};{Responsible}";
 		}
 
 		public static ContentStatusEntity FromString(string line)
