@@ -103,7 +103,7 @@ namespace Metamory.WebApi.Controllers.WebApi
 		}
 
 		[HttpPost, Route("content/{siteId}/{contentId}/{versionId}/status")]
-		public async Task<IActionResult> PostStatusChange(string siteId, string contentId, string versionId, StatusChangeModel statusModel)
+		public async Task<IActionResult> PostStatusChange(string siteId, string contentId, string versionId, [FromBody]StatusChangeModel statusModel)
 		{
 			if (!_authPolicy.AllowChangeContentStatus(siteId, contentId, User))
 			{
@@ -139,7 +139,6 @@ namespace Metamory.WebApi.Controllers.WebApi
 			{
 				model = await GetPostContentModelFromAjaxAsync(siteId, contentId);
 			}
-
 
 			if (model.ContentStream != null && model.ContentType != null)
 			{
