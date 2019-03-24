@@ -63,7 +63,7 @@ namespace Metamory.Api
 			await _statusRepository.AddStatusEntryAsync(siteId, statusEntry);
 		}
 
-		public async Task<IEnumerable<ContentMetadata>> GetVersionsAsync(string siteId, string contentId)
+		public async Task<ContentMetadata> GetVersionsAsync(string siteId, string contentId)
 		{
 			siteId = _canonicalizeService.Canonicalize(siteId);
 			contentId = _canonicalizeService.Canonicalize(contentId);
@@ -74,23 +74,26 @@ namespace Metamory.Api
 			var now = DateTimeOffset.Now;
 			var publishedVersionId = _versioningService.GetCurrentlyPublishedVersion(now, statusEntries);
 
-			return from version in versions
-				   orderby version.Timestamp
-				   select new ContentMetadata
-				   {
-					   VersionId = version.VersionId,
-					   PreviousVersionId = version.PreviousVersionId,
-					   Timestamp = version.Timestamp,
-					   Author = version.Author,
-					   Label = version.Label,
-					   IsPublished = publishedVersionId == version.VersionId
-				   };
+			return new ContentMetadata
+			{
+				Versions = from version in versions
+						   orderby version.Timestamp
+						   select new ContentMetadata.Version
+						   {
+							   VersionId = version.VersionId,
+							   PreviousVersionId = version.PreviousVersionId,
+							   Timestamp = version.Timestamp,
+							   Author = version.Author,
+							   Label = version.Label,
+						   },
+				PublishedVersionId = publishedVersionId
+			};
 		}
 
-		public async Task<ContentMetadata> GetMetadataAsync(string siteId, string contentId, string versionId)
+		public async Task<ContentMetadata.Version> GetVersionAsync(string siteId, string contentId, string versionId)
 		{
-			var versions = await GetVersionsAsync(siteId, contentId);
-			return versions.SingleOrDefault(x => x.VersionId == versionId);
+			var metadata = await GetVersionsAsync(siteId, contentId);
+			return metadata.Versions.SingleOrDefault(x => x.VersionId == versionId);
 		}
 
 		public async Task<string> DownloadContentToStreamAsync(string siteId, string contentId, string versionId, Stream target)
@@ -105,7 +108,7 @@ namespace Metamory.Api
 			return contentType;
 		}
 
-		public async Task<ContentMetadata> StoreAsync(string siteId,
+		public async Task<ContentMetadata.Version> StoreAsync(string siteId,
 			string contentId,
 			DateTimeOffset now,
 			Stream contentStream,
@@ -133,9 +136,9 @@ namespace Metamory.Api
 
 			var t2 = _contentRepository.AddContentAsync(siteId, contentId, versionId, contentStream, contentType, now, previousVersionId, author, label);
 
-			await Task.WhenAll(new[]{t1, t2});
+			await Task.WhenAll(new[] { t1, t2 });
 
-			return new ContentMetadata
+			return new ContentMetadata.Version
 			{
 				VersionId = versionId,
 				Timestamp = now,
@@ -152,7 +155,7 @@ namespace Metamory.Api
 
 		//	throw new NotImplementedException();
 		//}
-		
+
 		void IDisposable.Dispose()
 		{
 			// ...
