@@ -39,10 +39,11 @@ namespace Metamory.Api.Providers.FileSystem
 			{
 				var everything = await sr.ReadToEndAsync();
 				return everything.Split(new[] { Environment.NewLine }, StringSplitOptions.None)
-								 .Where(line => !String.IsNullOrWhiteSpace(line))
+								 .Where(line => !String.IsNullOrWhiteSpace(line) && !line.StartsWith("#"))
 								 .Select(line => ContentStatusEntity.FromString(line));
 			}
 		}
+
 
 		public async Task AddStatusEntryAsync(string siteId, ContentStatusEntity statusEntry)
 		{
@@ -50,8 +51,14 @@ namespace Metamory.Api.Providers.FileSystem
 			Directory.CreateDirectory(folderPath);
 
 			var filePath = Path.Combine(folderPath, CONTENTSTATUS_FILENAME);
+			var writeHeader = !File.Exists(filePath);
 			using (var sw = new StreamWriter(filePath, true))
 			{
+				if(writeHeader)
+				{
+					await sw.WriteLineAsync($"#Timestamp;ContentId;VersionId;StartTime;Status;Responsible");
+				}
+
 				await sw.WriteLineAsync(statusEntry.ToString());
 			}
 		}
